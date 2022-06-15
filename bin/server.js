@@ -18,27 +18,33 @@ const server = http.createServer((request, response) => {
   response.end('okay')
 })
 
-const mongoURL = process.env.MONGO_URL || 'mongodb://localhost:27017/maestroqa'
+const mongoURL = process.env.MONGO_URL || 'mongodb://127.0.0.1:27017/'
 const mongo = new MongoClient(mongoURL)
 
 wss.on('connection', setupWSConnection)
 
 function hashToken (loginToken) {
   const hashedToken = crypto.createHash('sha256').update(loginToken).digest('base64')
-  console.log(loginToken, hashedToken)
   return hashedToken
 }
 
 async function authenticate (request, next) {
-  const rawHeaders = request.rawHeaders // an array instead of obj k , v are in successive indexes
-  const loginHeaderIndex = request.rawHeaders.indexOf('loginToken')
-  if (loginHeaderIndex === -1) {
-    next('missing loginToken header')
+  const tokenIdMatch = request.url.match(/tokenId=(?<tokenId>[^&#?\s]+)/)
+  if (!tokenIdMatch) {
+    next('missing loginToken')
   }
-  const loginToken = rawHeaders[loginHeaderIndex + 1]
+  const loginToken = tokenIdMatch.groups.tokenId
   const hashedToken = hashToken(loginToken)
-  await mongo.connect()
-  const user = await mongo.db('maestroqa').collection('users').findOne({ 'services.resume.loginTokens.hashedToken': hashedToken })
+  let user
+  try {
+    console.log('connecting to mongo...')
+    await mongo.connect()
+    console.log('connected')
+    user = await mongo.db('maestroqa').collection('users').findOne({ 'services.resume.loginTokens.hashedToken': hashedToken })
+  } finally {
+    // Ensures that the client will close when you finish/error
+    await mongo.close();
+  }
   if (!user) {
     next('user not found')
   }
