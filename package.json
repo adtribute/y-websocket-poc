@@ -57,6 +57,7 @@
   "dependencies": {
     "lib0": "^0.2.42",
     "lodash.debounce": "^4.0.8",
+    "mongodb": "^4.7.0",
     "y-protocols": "^1.0.5"
   },
   "devDependencies": {
