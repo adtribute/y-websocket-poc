@@ -21,7 +21,6 @@ const server = http.createServer((request, response) => {
 const mongoURL = process.env.MONGO_URL || 'mongodb://127.0.0.1:27017/'
 const mongo = new MongoClient(mongoURL)
 
-wss.on('connection', setupWSConnection)
 
 function hashToken (loginToken) {
   const hashedToken = crypto.createHash('sha256').update(loginToken).digest('base64')
@@ -41,9 +40,10 @@ async function authenticate (request, next) {
     await mongo.connect()
     console.log('connected')
     user = await mongo.db('maestroqa').collection('users').findOne({ 'services.resume.loginTokens.hashedToken': hashedToken })
+    // todo: add check that they have access to the "room" next
   } finally {
     // Ensures that the client will close when you finish/error
-    await mongo.close();
+    await mongo.close()
   }
   if (!user) {
     next('user not found')
@@ -51,7 +51,6 @@ async function authenticate (request, next) {
   next(false, user)
 }
 
-// const map = new Map()
 server.on('upgrade', async function upgrade (request, socket, head) {
   await authenticate(request, function next (err, user) {
     if (err) {
@@ -59,12 +58,13 @@ server.on('upgrade', async function upgrade (request, socket, head) {
       socket.destroy()
       return
     }
-    // map.set(user._id, wss)
     wss.handleUpgrade(request, socket, head, function done (ws) {
-      wss.emit('connection', ws, request)
+      wss.emit('connection', ws, request, user)
     })
   })
 })
+
+wss.on('connection', setupWSConnection)
 
 server.listen(port, () => {
   console.log(`running at '${host}' on port ${port}`)
